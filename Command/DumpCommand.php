@@ -39,6 +39,7 @@ class DumpCommand extends ContainerAwareCommand
             ->addOption('watch', null, InputOption::VALUE_NONE, 'Check for changes every second, debug mode only')
             ->addOption('force', null, InputOption::VALUE_NONE, 'Force an initial generation of all assets (used with --watch)')
             ->addOption('period', null, InputOption::VALUE_REQUIRED, 'Set the polling period in seconds (used with --watch)', 1)
+            ->addOption('no-dump-main', null, InputOption::VALUE_NONE, 'Do not dump main assets')
         ;
     }
 
@@ -94,12 +95,14 @@ class DumpCommand extends ContainerAwareCommand
             $previously = unserialize(file_get_contents($cache));
         }
 
+        $dumpMain = ! $input->getOption('no-dump-main');
+
         $error = '';
         while (true) {
             try {
                 foreach ($this->am->getNames() as $name) {
                     if ($this->checkAsset($name, $previously)) {
-                        $this->dumpAsset($name, $output);
+                        $this->dumpAsset($name, $output, $previously, $dumpMain);
                     }
                 }
 
@@ -110,7 +113,7 @@ class DumpCommand extends ContainerAwareCommand
                 file_put_contents($cache, serialize($previously));
                 $error = '';
 
-                sleep($input->getOption('period'));
+                usleep($input->getOption('period')*1000000);
             } catch (\Exception $e) {
                 if ($error != $msg = $e->getMessage()) {
                     $output->writeln('<error>[error]</error> '.$msg);
@@ -154,19 +157,33 @@ class DumpCommand extends ContainerAwareCommand
      * @param string          $name   An asset name
      * @param OutputInterface $output The command output
      */
-    private function dumpAsset($name, OutputInterface $output)
+    private function dumpAsset($name, OutputInterface $output, array &$previously = array(), $dumpMain = true)
     {
         $asset = $this->am->get($name);
         $formula = $this->am->getFormula($name);
 
-        // start by dumping the main asset
-        $this->doDump($asset, $output);
-
         // dump each leaf if debug
         if (isset($formula[2]['debug']) ? $formula[2]['debug'] : $this->am->isDebug()) {
             foreach ($asset as $leaf) {
-                $this->doDump($leaf, $output);
+                $key = serialize($leaf);
+                $mtime = $leaf->getLastModified();
+                if (isset($previously[$key])) {
+                    $changed = $previously[$key]['mtime'] != $mtime;
+                } else {
+                    $changed = true;
+                }
+
+                $previously[$key] = array('mtime' => $mtime);
+
+                if ($changed) {
+                    $this->doDump($leaf, $output);
+                }
             }
+        }
+
+        if ($dumpMain) {
+            // dump the main asset
+            $this->doDump($asset, $output);
         }
     }
 
