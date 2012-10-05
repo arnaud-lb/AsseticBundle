@@ -68,10 +68,20 @@ class DumpCommandTest extends \PHPUnit_Framework_TestCase
         $this->kernel->expects($this->any())
             ->method('getContainer')
             ->will($this->returnValue($this->container));
+
+        $writeTo = $this->writeTo;
         $this->container->expects($this->any())
             ->method('getParameter')
-            ->with('assetic.write_to')
-            ->will($this->returnValue($this->writeTo));
+            ->will($this->returnCallback(function($p) use($writeTo) {
+                if ('assetic.write_to' === $p) {
+                    return $writeTo;
+                } else if ('assetic.variables' === $p) {
+                    return array();
+                }
+
+                throw new \RuntimeException(sprintf('Unknown parameter "%s".', $p));
+            }));
+
         $this->container->expects($this->once())
             ->method('get')
             ->with('assetic.asset_manager')
@@ -113,7 +123,7 @@ class DumpCommandTest extends \PHPUnit_Framework_TestCase
             ->method('getFormula')
             ->with('test_asset')
             ->will($this->returnValue(array()));
-        $this->am->expects($this->once())
+        $this->am->expects($this->exactly(2))
             ->method('isDebug')
             ->will($this->returnValue(false));
         $asset->expects($this->once())
@@ -122,6 +132,12 @@ class DumpCommandTest extends \PHPUnit_Framework_TestCase
         $asset->expects($this->once())
             ->method('dump')
             ->will($this->returnValue('/* test_asset */'));
+        $asset->expects($this->any())
+            ->method('getVars')
+            ->will($this->returnValue(array()));
+        $asset->expects($this->any())
+            ->method('getValues')
+            ->will($this->returnValue(array()));
 
         $this->command->run(new ArrayInput(array()), new NullOutput());
 
@@ -145,7 +161,7 @@ class DumpCommandTest extends \PHPUnit_Framework_TestCase
             ->method('getFormula')
             ->with('test_asset')
             ->will($this->returnValue(array()));
-        $this->am->expects($this->once())
+        $this->am->expects($this->exactly(2))
             ->method('isDebug')
             ->will($this->returnValue(true));
         $asset->expects($this->once())
@@ -157,12 +173,24 @@ class DumpCommandTest extends \PHPUnit_Framework_TestCase
         $asset->expects($this->once())
             ->method('getIterator')
             ->will($this->returnValue(new \ArrayIterator(array($leaf))));
+        $asset->expects($this->any())
+            ->method('getVars')
+            ->will($this->returnValue(array()));
+        $asset->expects($this->any())
+            ->method('getValues')
+            ->will($this->returnValue(array()));
         $leaf->expects($this->once())
             ->method('getTargetPath')
             ->will($this->returnValue('test_leaf.css'));
         $leaf->expects($this->once())
             ->method('dump')
             ->will($this->returnValue('/* test_leaf */'));
+        $leaf->expects($this->any())
+            ->method('getVars')
+            ->will($this->returnValue(array()));
+        $leaf->expects($this->any())
+            ->method('getValues')
+            ->will($this->returnValue(array()));
 
         $this->command->run(new ArrayInput(array()), new NullOutput());
 
