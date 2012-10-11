@@ -18,6 +18,7 @@ use Symfony\Component\Console\Input\InputArgument;
 use Symfony\Component\Console\Input\InputInterface;
 use Symfony\Component\Console\Input\InputOption;
 use Symfony\Component\Console\Output\OutputInterface;
+use Assetic\Asset\AssetReference;
 
 /**
  * Dumps assets to the filesystem.
@@ -116,6 +117,7 @@ class DumpCommand extends ContainerAwareCommand
                 usleep($input->getOption('period')*1000000);
             } catch (\Exception $e) {
                 if ($error != $msg = $e->getMessage()) {
+                    echo $e;
                     $output->writeln('<error>[error]</error> '.$msg);
                     $error = $msg;
                 }
@@ -165,6 +167,12 @@ class DumpCommand extends ContainerAwareCommand
         // dump each leaf if debug
         if (isset($formula[2]['debug']) ? $formula[2]['debug'] : $this->am->isDebug()) {
             foreach ($asset as $leaf) {
+                if ($leaf instanceof AssetReference) {
+                    $p = new \ReflectionProperty($leaf, 'name');
+                    $p->setAccessible(true);
+                    $name = $p->getValue($leaf);
+                    $leaf = $this->am->get($name);
+                }
                 $key = serialize($leaf);
                 $mtime = $leaf->getLastModified();
                 if (isset($previously[$key])) {
