@@ -11,9 +11,6 @@
 
 namespace Symfony\Bundle\AsseticBundle\Command;
 
-use Assetic\Util\PathUtils;
-
-use Assetic\AssetWriter;
 use Assetic\Asset\AssetInterface;
 use Assetic\Factory\LazyAssetManager;
 use Symfony\Bundle\FrameworkBundle\Command\ContainerAwareCommand;
@@ -58,7 +55,7 @@ class DumpCommand extends ContainerAwareCommand
     protected function execute(InputInterface $input, OutputInterface $output)
     {
         $output->writeln(sprintf('Dumping all <comment>%s</comment> assets.', $input->getOption('env')));
-        $output->writeln(sprintf('Debug mode is <comment>%s</comment>.', $this->am->isDebug() ? 'on' : 'off'));
+        $output->writeln(sprintf('Debug mode is <comment>%s</comment>.', $input->getOption('no-debug') ? 'off' : 'on'));
         $output->writeln('');
 
         if (!$input->getOption('watch')) {
@@ -200,50 +197,31 @@ class DumpCommand extends ContainerAwareCommand
      */
     private function doDump(AssetInterface $asset, OutputInterface $output)
     {
-        $writer = new AssetWriter(sys_get_temp_dir(), $this->getContainer()->getParameter('assetic.variables'));
-        $ref = new \ReflectionMethod($writer, 'getCombinations');
-        $ref->setAccessible(true);
-        $combinations = $ref->invoke($writer, $asset->getVars());
-
-        foreach ($combinations as $combination) {
-            $asset->setValues($combination);
-
-            $target = rtrim($this->basePath, '/').'/'.str_replace('_controller/', '',
-                PathUtils::resolvePath($asset->getTargetPath(), $asset->getVars(),
-                    $asset->getValues()));
-            if (!is_dir($dir = dirname($target))) {
-                $output->writeln(sprintf(
-                    '<comment>%s</comment> <info>[dir+]</info> %s',
-                    date('H:i:s'),
-                    $dir
-                ));
-                if (false === @mkdir($dir, 0777, true)) {
-                    throw new \RuntimeException('Unable to create directory '.$dir);
-                }
+        $target = rtrim($this->basePath, '/').'/'.str_replace('_controller/', '', $asset->getTargetPath());
+        if (!is_dir($dir = dirname($target))) {
+            $output->writeln('<info>[dir+]</info>  '.$dir);
+            if (false === @mkdir($dir, 0777, true)) {
+                throw new \RuntimeException('Unable to create directory '.$dir);
             }
+        }
 
-            $output->writeln(sprintf(
-                '<comment>%s</comment> <info>[file+]</info> %s',
-                date('H:i:s'),
-                $target
-            ));
-            if ($this->verbose) {
-                if ($asset instanceof \Traversable) {
-                    foreach ($asset as $leaf) {
-                        $root = $leaf->getSourceRoot();
-                        $path = $leaf->getSourcePath();
-                        $output->writeln(sprintf('        <comment>%s/%s</comment>', $root ?: '[unknown root]', $path ?: '[unknown path]'));
-                    }
-                } else {
-                    $root = $asset->getSourceRoot();
-                    $path = $asset->getSourcePath();
+        $output->writeln('<info>[file+]</info> '.$target);
+        if ($this->verbose) {
+            if ($asset instanceof \Traversable) {
+                foreach ($asset as $leaf) {
+                    $root = $leaf->getSourceRoot();
+                    $path = $leaf->getSourcePath();
                     $output->writeln(sprintf('        <comment>%s/%s</comment>', $root ?: '[unknown root]', $path ?: '[unknown path]'));
                 }
+            } else {
+                $root = $asset->getSourceRoot();
+                $path = $asset->getSourcePath();
+                $output->writeln(sprintf('        <comment>%s/%s</comment>', $root ?: '[unknown root]', $path ?: '[unknown path]'));
             }
+        }
 
-            if (false === @file_put_contents($target, $asset->dump())) {
-                throw new \RuntimeException('Unable to write file '.$target);
-            }
+        if (false === @file_put_contents($target, $asset->dump())) {
+            throw new \RuntimeException('Unable to write file '.$target);
         }
     }
 }

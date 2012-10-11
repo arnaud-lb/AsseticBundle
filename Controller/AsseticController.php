@@ -11,8 +11,6 @@
 
 namespace Symfony\Bundle\AsseticBundle\Controller;
 
-use Assetic\ValueSupplierInterface;
-
 use Assetic\Asset\AssetCache;
 use Assetic\Asset\AssetInterface;
 use Assetic\Factory\LazyAssetManager;
@@ -34,7 +32,6 @@ class AsseticController
     protected $cache;
     protected $enableProfiler;
     protected $profiler;
-    protected $valueSupplier;
 
     public function __construct(Request $request, LazyAssetManager $am, CacheInterface $cache, $enableProfiler = false, Profiler $profiler = null)
     {
@@ -43,11 +40,6 @@ class AsseticController
         $this->cache = $cache;
         $this->enableProfiler = (boolean) $enableProfiler;
         $this->profiler = $profiler;
-    }
-
-    public function setValueSupplier(ValueSupplierInterface $supplier)
-    {
-        $this->valueSupplier = $supplier;
     }
 
     public function render($name, $pos = null)
@@ -98,14 +90,6 @@ class AsseticController
 
     protected function cachifyAsset(AssetInterface $asset)
     {
-        if ($vars = $asset->getVars()) {
-            if (null === $this->valueSupplier) {
-                throw new \RuntimeException(sprintf('You must configure a value supplier if you have assets with variables.'));
-            }
-
-            $asset->setValues(array_intersect_key($this->valueSupplier->getValues(), array_flip($vars)));
-        }
-
         return new AssetCache($asset, $this->cache);
     }
 

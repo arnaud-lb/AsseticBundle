@@ -47,29 +47,4 @@ class AsseticResource implements SymfonyResourceInterface
     {
         return $this->resource;
     }
-
-    public function exists()
-    {
-        return true;
-    }
-
-    public function getId()
-    {
-        return md5('assetic'.$this->resource);
-    }
-
-    public function getModificationTime()
-    {
-        return -1;
-    }
-
-    public function serialize()
-    {
-        return serialize($this->resource);
-    }
-
-    public function unserialize($serialized)
-    {
-        $this->resource = unserialize($serialized);
-    }
 }

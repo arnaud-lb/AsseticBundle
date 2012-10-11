@@ -111,7 +111,6 @@ class AsseticExtensionTest extends \PHPUnit_Framework_TestCase
             array('jpegtran'),
             array('less'),
             array('lessphp'),
-            array('scssphp'),
             array('optipng'),
             array('packager'),
             array('pngout'),
@@ -208,7 +207,6 @@ class AsseticExtensionTest extends \PHPUnit_Framework_TestCase
 
         $container = new $class();
         $container->enterScope('request');
-        $container->set('request', Request::create('/'));
         $container->set('kernel', $this->kernel);
 
         return $container;

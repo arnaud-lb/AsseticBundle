@@ -11,7 +11,6 @@
 
 namespace Symfony\Bundle\AsseticBundle\Twig;
 
-use Assetic\ValueSupplierInterface;
 use Assetic\Extension\Twig\AsseticExtension as BaseAsseticExtension;
 use Assetic\Factory\AssetFactory;
 use Symfony\Component\Templating\TemplateNameParserInterface;
@@ -25,9 +24,9 @@ class AsseticExtension extends BaseAsseticExtension
 {
     private $useController;
 
-    public function __construct(AssetFactory $factory, TemplateNameParserInterface $templateNameParser, $useController = false, $functions = array(), $enabledBundles = array(), ValueSupplierInterface $valueSupplier = null)
+    public function __construct(AssetFactory $factory, TemplateNameParserInterface $templateNameParser, $useController = false, $functions = array(), $enabledBundles = array())
     {
-        parent::__construct($factory, $functions, $valueSupplier);
+        parent::__construct($factory, $functions);
 
         $this->useController = $useController;
         $this->templateNameParser = $templateNameParser;
