@@ -173,7 +173,7 @@ class DumpCommand extends ContainerAwareCommand
                     $name = $p->getValue($leaf);
                     $leaf = $this->am->get($name);
                 }
-                $key = serialize($leaf);
+                $key = $leaf->getTargetPath();
                 $mtime = $leaf->getLastModified();
                 if (isset($previously[$key])) {
                     $changed = $previously[$key]['mtime'] != $mtime;
