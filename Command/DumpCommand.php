@@ -19,6 +19,9 @@ use Symfony\Component\Console\Input\InputInterface;
 use Symfony\Component\Console\Input\InputOption;
 use Symfony\Component\Console\Output\OutputInterface;
 use Assetic\Asset\AssetReference;
+use Lurker\ResourceWatcher;
+use Symfony\Component\Finder\Finder;
+use Lurker\Event\FilesystemEvent;
 
 /**
  * Dumps assets to the filesystem.
@@ -97,6 +100,63 @@ class DumpCommand extends ContainerAwareCommand
         }
 
         $dumpMain = ! $input->getOption('no-dump-main');
+
+        $error = '';
+
+        if (!function_exists('inotify_init')) {
+            $output->writeln("<error>inotify extension not loaded; --watch may be CPU angry</error>");
+        }
+
+        if (class_exists('Lurker\ResourceWatcher')) {
+        $watcher = new ResourceWatcher;
+
+        $root = realpath($this->getContainer()->getParameter('kernel.root_dir').'/../src');
+        $it = Finder::create()
+            ->in($root)
+            ->name('Resources')
+            ->directories()
+            ->getIterator();
+
+        foreach ($it as $file) {
+            $path = realpath($file->getPathname());
+            $subdirs = Finder::create()
+                ->in($path)
+                ->directories()
+                ->getIterator();
+            $i = 0;
+            foreach ($subdirs as $dir) {
+                $i++;
+                $output->writeln(sprintf("Watching <comment>%s</comment>", $dir));
+                $watcher->track('resources'.$i, $dir->getPathname());
+                $watcher->addListener('resources'.$i, function (FilesystemEvent $event) use (&$error, &$previously, $dumpMain, $output, $prop, $cache) {
+                    try {
+                        $output->writeln('event: ' . $event->getTypeString());
+
+                        foreach ($this->am->getNames() as $name) {
+                            if ($this->checkAsset($name, $previously)) {
+                                $this->dumpAsset($name, $output, $previously, $dumpMain);
+                            }
+                        }
+
+                        // reset the asset manager
+                        $prop->setValue($this->am, array());
+                        $this->am->load();
+
+                        file_put_contents($cache, serialize($previously));
+                        $error = '';
+                    } catch (\Exception $e) {
+                        if ($error != $msg = $e->getMessage()) {
+                            echo $e;
+                            $output->writeln('<error>[error]</error> '.$msg);
+                            $error = $msg;
+                        }
+                    }
+                });
+            }
+        }
+
+        $watcher->start();
+        }
 
         $error = '';
         while (true) {
