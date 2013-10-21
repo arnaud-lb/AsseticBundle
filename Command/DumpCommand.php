@@ -99,18 +99,39 @@ class DumpCommand extends ContainerAwareCommand
             $previously = unserialize(file_get_contents($cache));
         }
 
+        if (!class_exists('Lurker\ResourceWatcher')) {
+            $output->writeln("<error>Cannot find class Lurker\ResourceWatcher; --watch will be CPU hungry</error>");
+        } else if (!function_exists('inotify_init')) {
+            $output->writeln("<error>inotify extension not loaded; --watch will be CPU hungry</error>");
+        }
+
         $dumpMain = ! $input->getOption('no-dump-main');
 
         $error = '';
 
-        if (!function_exists('inotify_init')) {
-            $output->writeln("<error>inotify extension not loaded; --watch may be CPU angry</error>");
-        }
+        $output->writeln("Running initial watch");
+
+        $this->watchOnce($input, $output, $previously, $dumpMain, $prop, $cache, $error, false);
 
         if (class_exists('Lurker\ResourceWatcher')) {
+            $output->writeln("Running blocking watch");
+            $this->lurk($input, $output, $previously, $dumpMain, $prop, $cache);
+        }
+
+        $output->writeln("Running buzy watch");
+
+        while (true) {
+            $this->watchOnce($input, $output, $previously, $dumpMain, $prop, $cache, $error, true);
+        }
+    }
+
+    private function lurk(InputInterface $input, OutputInterface $output, array &$previously, $dumpMain, $prop, $cache)
+    {
+        $error = '';
         $watcher = new ResourceWatcher;
 
         $root = realpath($this->getContainer()->getParameter('kernel.root_dir').'/../src');
+
         $it = Finder::create()
             ->in($root)
             ->name('Resources')
@@ -128,59 +149,47 @@ class DumpCommand extends ContainerAwareCommand
                 $i++;
                 $output->writeln(sprintf("Watching <comment>%s</comment>", $dir));
                 $watcher->track('resources'.$i, $dir->getPathname());
-                $watcher->addListener('resources'.$i, function (FilesystemEvent $event) use (&$error, &$previously, $dumpMain, $output, $prop, $cache) {
-                    try {
-                        $output->writeln('event: ' . $event->getTypeString());
-
-                        foreach ($this->am->getNames() as $name) {
-                            if ($this->checkAsset($name, $previously)) {
-                                $this->dumpAsset($name, $output, $previously, $dumpMain);
-                            }
-                        }
-
-                        // reset the asset manager
-                        $prop->setValue($this->am, array());
-                        $this->am->load();
-
-                        file_put_contents($cache, serialize($previously));
-                        $error = '';
-                    } catch (\Exception $e) {
-                        if ($error != $msg = $e->getMessage()) {
-                            echo $e;
-                            $output->writeln('<error>[error]</error> '.$msg);
-                            $error = $msg;
-                        }
-                    }
-                });
             }
         }
 
-        $watcher->start();
-        }
-
-        $error = '';
         while (true) {
-            try {
-                foreach ($this->am->getNames() as $name) {
-                    if ($this->checkAsset($name, $previously)) {
-                        $this->dumpAsset($name, $output, $previously, $dumpMain);
-                    }
+            $events = $watcher->getTracker()->getEvents();
+            foreach ($events as $event) {
+                $output->writeln('event: ' . $event->getTypeString());
+            }
+            if (count($events)) {
+                $this->watchOnce($input, $output, $previously, $dumpMain, $prop, $cache, $error, false);
+            } else {
+                // the resource tracker doesn't block on the inotify fd ..
+                usleep(1000000);
+            }
+        }
+    }
+
+    private function watchOnce(InputInterface $input, OutputInterface $output, array &$previously, $dumpMain, $prop, $cache, &$error, $sleep)
+    {
+        try {
+            foreach ($this->am->getNames() as $name) {
+                if ($this->checkAsset($name, $previously)) {
+                    $this->dumpAsset($name, $output, $previously, $dumpMain);
                 }
+            }
 
-                // reset the asset manager
-                $prop->setValue($this->am, array());
-                $this->am->load();
+            // reset the asset manager
+            $prop->setValue($this->am, array());
+            $this->am->load();
 
-                file_put_contents($cache, serialize($previously));
-                $error = '';
+            file_put_contents($cache, serialize($previously));
+            $error = '';
 
+            if ($sleep) {
                 usleep($input->getOption('period')*1000000);
-            } catch (\Exception $e) {
-                if ($error != $msg = $e->getMessage()) {
-                    echo $e;
-                    $output->writeln('<error>[error]</error> '.$msg);
-                    $error = $msg;
-                }
+            }
+        } catch (\Exception $e) {
+            if ($error != $msg = $e->getMessage()) {
+                // echo $e;
+                $output->writeln('<error>[error]</error> '.$msg);
+                $error = $msg;
             }
         }
     }
