@@ -143,6 +143,7 @@ class DumpCommand extends ContainerAwareCommand
             $subdirs = Finder::create()
                 ->in($path)
                 ->directories()
+                ->exclude('node_modules')
                 ->getIterator();
             $i = 0;
             foreach ($subdirs as $dir) {
@@ -168,29 +169,21 @@ class DumpCommand extends ContainerAwareCommand
 
     private function watchOnce(InputInterface $input, OutputInterface $output, array &$previously, $dumpMain, $prop, $cache, &$error, $sleep)
     {
-        try {
-            foreach ($this->am->getNames() as $name) {
-                if ($this->checkAsset($name, $previously)) {
-                    $this->dumpAsset($name, $output, $previously, $dumpMain);
-                }
+        foreach ($this->am->getNames() as $name) {
+            if ($this->checkAsset($name, $previously)) {
+                $this->dumpAsset($name, $output, $previously, $dumpMain);
             }
+        }
 
-            // reset the asset manager
-            $prop->setValue($this->am, array());
-            $this->am->load();
+        // reset the asset manager
+        $prop->setValue($this->am, array());
+        $this->am->load();
 
-            file_put_contents($cache, serialize($previously));
-            $error = '';
+        file_put_contents($cache, serialize($previously));
+        $error = '';
 
-            if ($sleep) {
-                usleep($input->getOption('period')*1000000);
-            }
-        } catch (\Exception $e) {
-            if ($error != $msg = $e->getMessage()) {
-                // echo $e;
-                $output->writeln('<error>[error]</error> '.$msg);
-                $error = $msg;
-            }
+        if ($sleep) {
+            usleep($input->getOption('period')*1000000);
         }
     }
 
