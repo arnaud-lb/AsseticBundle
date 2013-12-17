@@ -99,12 +99,6 @@ class DumpCommand extends ContainerAwareCommand
             $previously = unserialize(file_get_contents($cache));
         }
 
-        if (!class_exists('Lurker\ResourceWatcher')) {
-            $output->writeln("<error>Cannot find class Lurker\ResourceWatcher; --watch will be CPU hungry</error>");
-        } else if (!function_exists('inotify_init')) {
-            $output->writeln("<error>inotify extension not loaded; --watch will be CPU hungry</error>");
-        }
-
         $dumpMain = ! $input->getOption('no-dump-main');
 
         $error = '';
@@ -113,9 +107,11 @@ class DumpCommand extends ContainerAwareCommand
 
         $this->watchOnce($input, $output, $previously, $dumpMain, $prop, $cache, $error, false);
 
-        if (class_exists('Lurker\ResourceWatcher')) {
+        if (function_exists('inotify_init')) {
             $output->writeln("Running blocking watch");
             $this->lurk($input, $output, $previously, $dumpMain, $prop, $cache);
+        } else {
+            $output->writeln("<error>inotify extension not loaded; --watch will be CPU hungry</error>");
         }
 
         $output->writeln("Running buzy watch");
