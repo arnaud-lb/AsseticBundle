@@ -134,6 +134,7 @@ class DumpCommand extends ContainerAwareCommand
             ->directories()
             ->getIterator();
 
+        $i = 0;
         foreach ($it as $file) {
             $path = realpath($file->getPathname());
             $subdirs = Finder::create()
@@ -141,7 +142,6 @@ class DumpCommand extends ContainerAwareCommand
                 ->directories()
                 ->exclude('node_modules')
                 ->getIterator();
-            $i = 0;
             foreach ($subdirs as $dir) {
                 $i++;
                 $output->writeln(sprintf("Watching <comment>%s</comment>", $dir));
